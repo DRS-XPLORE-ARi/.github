@@ -5,8 +5,9 @@ using Opc.UaFx.Client;
 using System.Collections;
 using UnityEngine.EventSystems;
 using Unity.VisualScripting;
+using System.Collections.Generic;
 
-public class TestButtons : MonoBehaviour
+public class OPCValues : MonoBehaviour
 {
     private readonly WaitForSecondsRealtime updateDelay = new(2);
     private bool updateUI = true;
@@ -15,11 +16,13 @@ public class TestButtons : MonoBehaviour
     private bool bt_pressed;
     Slider ui_slider;
     Button bt_button;
-    
+
     OpcClient client;
 
+    List<OpcNodeId> nodeList;
     string targetSlider;
     string targetToggle;
+    string deviceName = "axc-f-2152-wtp";
 
     // Start is called before the first frame update
     void Start()
@@ -41,27 +44,68 @@ public class TestButtons : MonoBehaviour
         pointerDown.callback.AddListener((data) => { OnPointerDown((PointerEventData)data); });
         trigger.triggers.Add(pointerDown);
 
-
-        targetSlider = "ns=5;s=Arp.Plc.Eclr/iValue";
+        OpcNodeId slider = OpcNodeId.Parse(targetSlider);
+        
+        targetSlider = "ns=5;s=axc-f-2152-wtp/iValue";
         targetToggle = "";
 
-        client = new OpcClient("opc.tcp://172.20.4.132:4840");
-        client.Security.UserIdentity = new OpcClientIdentity("admin", "4e7de71f");
+        client = new OpcClient("opc.tcp://172.20.5.240:4840");
+        client.Security.UserIdentity = new OpcClientIdentity("admin", "2aa1bc26");
 
         //bt_toggle.onValueChanged.AddListener(delegate {ToggleValueChanged(bt_toggle, targetToggle);});
-        ui_slider.onValueChanged.AddListener(delegate {SliderValueChanged(ui_slider, targetSlider);});
-        
+        ui_slider.onValueChanged.AddListener(delegate { SliderValueChanged(ui_slider, targetSlider); });
 
+        nodeList = NodeListInit();
         StartCoroutine(UpdateUIvalues());
+    }
+    private List<OpcNodeId> NodeListInit()
+    {
+        List<OpcNodeId> nodeList = new()
+        {   
+            //Brunnen
+            OpcNodeId.Parse($"s={deviceName}/I_uiLevelBE1"),
+            OpcNodeId.Parse($"s={deviceName}/I_xLimitLevelBE1Max"),
+            OpcNodeId.Parse($"s={deviceName}/I_xLimitLevelBE1Min"),
+
+            //Filter
+            OpcNodeId.Parse($"s={deviceName}/I_xLimitLevelFL1Max"),
+
+            //Zwischenbehälter
+            OpcNodeId.Parse($"s={deviceName}/I_uiLevelBE2"),
+            OpcNodeId.Parse($"s={deviceName}/I_xLimitLevelBE2Max"),
+            OpcNodeId.Parse($"s={deviceName}/I_xLimitLevelBE2Mid"),
+            OpcNodeId.Parse($"s={deviceName}/I_xLimitLevelBE2Min"),
+
+            //Hochbehälter
+            OpcNodeId.Parse($"s={deviceName}/I_uiLevelBE3"),
+            OpcNodeId.Parse($"s={deviceName}/I_xLimitLevelBE3Min"),
+            OpcNodeId.Parse($"s={deviceName}/I_xLimitLevelBE3Max"),
+            OpcNodeId.Parse($"s={deviceName}/I_uiFlowBE3a"),
+
+            //Wegstrecke
+            OpcNodeId.Parse($"s={deviceName}/I_uiPumpSpeed"),
+            OpcNodeId.Parse($"s={deviceName}/I_uiPumpTemp"),
+            OpcNodeId.Parse($"s={deviceName}/I_xBallValve1open"),
+            OpcNodeId.Parse($"s={deviceName}/I_xBallValve1close"),
+            OpcNodeId.Parse($"s={deviceName}/I_xBallValve2open"),
+            OpcNodeId.Parse($"s={deviceName}/I_xBallValve2close"),
+            OpcNodeId.Parse($"s={deviceName}/I_uiControlValve1"),
+            OpcNodeId.Parse($"s={deviceName}/I_uiPressure1"),
+            OpcNodeId.Parse($"s={deviceName}/I_uiPressure2"),
+            OpcNodeId.Parse($"s={deviceName}/I_uiFlow1"),
+        };
+        return nodeList;
     }
 
     private IEnumerator UpdateUIvalues()
     {
-        while (updateUI) 
+        while (updateUI)
         {
             client.Connect();
 
+            var ns = client.Namespaces;
             OpcValue result = client.ReadNode(targetSlider);
+            var results = client.ReadNodes(nodeList);
             Debug.Log("Current slider value: " + result.Value);
             ui_slider.value = result.As<float>();
 
@@ -75,7 +119,7 @@ public class TestButtons : MonoBehaviour
         client.Connect();
 
         Debug.Log("Toggle new value" + toggle.isOn);
-        client.WriteNode(target,OpcAttribute.Value,toggle.isOn);
+        client.WriteNode(target, OpcAttribute.Value, toggle.isOn);
 
         client.Disconnect();
     }
@@ -91,8 +135,8 @@ public class TestButtons : MonoBehaviour
         client.Disconnect();
     }
 
-   public void OnPointerDown(PointerEventData data)
-   {
+    public void OnPointerDown(PointerEventData data)
+    {
         bt_pressed = true;
         Debug.Log("Button pressed = " + bt_pressed);
     }
